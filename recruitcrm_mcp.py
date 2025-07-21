@@ -221,7 +221,7 @@ def summarise(args: Dict[str, Any], payload: Dict[str, Any]) -> Dict[str, Any]:
 # 4.  MCP server + tool
 # ──────────────────────────────────────────────────────────────
 mcp = FastMCP("recruitcrm")
-app = mcp.asgi_app()
+app = mcp.sse_app()
 
 
 @mcp.tool()
