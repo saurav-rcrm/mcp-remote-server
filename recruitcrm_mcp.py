@@ -12,6 +12,8 @@ from typing import Dict, List, Any, Optional
 from dataclasses import dataclass
 from enum import Enum
 from starlette.middleware.cors import CORSMiddleware
+from starlette.applications import Starlette
+from starlette.routing import Mount
 
 # ──────────────────────────────────────────────────────────────
 # 0.  Env & constants
@@ -225,10 +227,16 @@ def summarise(args: Dict[str, Any], payload: Dict[str, Any]) -> Dict[str, Any]:
 # 4.  MCP server + tool
 # ──────────────────────────────────────────────────────────────
 mcp = FastMCP("recruitcrm")
-_app = mcp.sse_app()
+_sse_app = mcp.sse_app()
 
+# Mount the SSE app at the /mcp endpoint
+main_app = Starlette(routes=[
+    Mount('/mcp', app=_sse_app)
+])
+
+# Add CORS to the main app
 app = CORSMiddleware(
-    app=_app,
+    app=main_app,
     allow_origins=["*"],  # Allows all origins
     allow_credentials=True,
     allow_methods=["*"],  # Allows all methods
