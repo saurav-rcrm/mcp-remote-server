@@ -13,7 +13,12 @@ from dataclasses import dataclass
 from enum import Enum
 from starlette.middleware.cors import CORSMiddleware
 from starlette.applications import Starlette
-from starlette.routing import Mount
+from starlette.routing import Mount, Route
+from starlette.responses import JSONResponse
+
+async def homepage(request):
+    """A simple test endpoint to confirm the server is routing requests."""
+    return JSONResponse({'status': 'ok', 'message': 'RecruitCRM MCP Server is running'})
 
 # ──────────────────────────────────────────────────────────────
 # 0.  Env & constants
@@ -229,8 +234,9 @@ def summarise(args: Dict[str, Any], payload: Dict[str, Any]) -> Dict[str, Any]:
 mcp = FastMCP("recruitcrm")
 _sse_app = mcp.sse_app()
 
-# Mount the SSE app at the /mcp endpoint
+# Mount the SSE app at the /mcp endpoint and add a test route
 main_app = Starlette(routes=[
+    Route('/', homepage),
     Mount('/mcp', app=_sse_app)
 ])
 
