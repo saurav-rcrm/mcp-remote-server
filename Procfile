@@ -1,0 +1,1 @@
+web: python recruitcrm_mcp.py 
