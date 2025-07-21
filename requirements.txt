@@ -26,4 +26,4 @@ typing_extensions==4.13.2
 uvicorn==0.34.2
 pytz==2024.1
 gunicorn
-fastmcp[cli]>=2.3.0
+fastmcp
