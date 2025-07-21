@@ -1248,13 +1248,7 @@ orchestrator = RecruitCRMOrchestrator(tool_registry)
 
 # ──────────────────────────────────────────────────────────────
 if __name__ == "__main__":
-    # For deployment on services like Render, the PORT is provided as an
-    # environment variable. We default to 8000 for local development.
+    import os
     port = int(os.environ.get("PORT", 8000))
-
-    # As per the official FastMCP documentation, the `run` method with the
-    # 'http' transport is the correct way to start a production-ready
-    # web server. This handles creating the Uvicorn server and routing.
-    # We bind to 0.0.0.0 to make it accessible outside the container.
-    print(f"🚀 Starting RecruitCRM MCP server on port {port}", file=sys.stderr)
+    print(f"🚀 Starting RecruitCRM MCP server (HTTP) on port {port}", file=sys.stderr)
     mcp.run(transport="http", port=port)
