@@ -12,13 +12,33 @@ from typing import Dict, List, Any, Optional
 from dataclasses import dataclass
 from enum import Enum
 
+# ──────────────────────────────────────────────────────────────
+# 0.  Env & constants
+# ──────────────────────────────────────────────────────────────
+load_dotenv()
+RCRM_TOKEN = os.getenv("RCRM_TOKEN")
+if not RCRM_TOKEN:
+    sys.exit("❌  Set RCRM_TOKEN in your environment or .env file")
+
+HEADERS = {
+    "Authorization": f"Bearer {RCRM_TOKEN}",
+    "Content-Type":  "application/json",
+    "Origin":        "https://app.recruitcrm.io"
+}
+BASE_URL = "https://albatross.recruitcrm.io/v1/reports/search/get"
+
+DEBUG = os.getenv("DEBUG", "").lower() in ("1", "true", "yes")
+def log(*a):
+    if DEBUG:
+        print("[recruitcrm_mcp]", *a, file=sys.stderr)
+
 # 4.  MCP server + tool
 # ──────────────────────────────────────────────────────────────
 mcp = FastMCP("recruitcrm")
 
 # As per the official FastMCP documentation, mcp.http_app() creates the
 # correct application component for the Streamable HTTP transport.
-_http_app = mcp.http_app()
+# _http_app = mcp.http_app()
 
 # Mount the MCP application at the /mcp path. This will handle
 # both GET and POST requests sent to this endpoint.
