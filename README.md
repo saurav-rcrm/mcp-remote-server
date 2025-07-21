@@ -27,11 +27,11 @@ To run the server on your local machine for testing and development:
     ```bash
     python recruitcrm_mcp.py
     ```
-    The server will start on `http://localhost:8000`.
+    The server will start on `http://0.0.0.0:8000`.
 
 ## Deployment to Render
 
-This application is configured for production deployment on [Render](https://render.com/) using Gunicorn.
+This application is configured for production deployment on [Render](https://render.com/).
 
 1.  **Push your code to GitHub:**
     Create a new repository on GitHub and push this project's code.
@@ -44,7 +44,7 @@ This application is configured for production deployment on [Render](https://ren
     - **Name:** A name for your service (e.g., `recruitcrm-mcp-server`).
     - **Runtime:** Render should automatically detect `Python 3`.
     - **Build Command:** `pip install -r requirements.txt`
-    - **Start Command:** Render should automatically use the `web` process from the `Procfile`. The command is `gunicorn -w 4 -k uvicorn.workers.UvicornWorker --bind 0.0.0.0:$PORT recruitcrm_mcp:app`. You should not need to change this.
+    - **Start Command:** `python3 recruitcrm_mcp.py`. Render will use the command from the `Procfile`.
 
 4.  **Add Environment Variables:**
     - Go to the **Environment** tab for your new service.

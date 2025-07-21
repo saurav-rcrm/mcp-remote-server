@@ -11,224 +11,7 @@ from mcp.server.fastmcp import FastMCP
 from typing import Dict, List, Any, Optional
 from dataclasses import dataclass
 from enum import Enum
-from starlette.middleware.cors import CORSMiddleware
-from starlette.applications import Starlette
-from starlette.routing import Mount, Route
-from starlette.responses import JSONResponse
 
-async def homepage(request):
-    """A simple test endpoint to confirm the server is routing requests."""
-    return JSONResponse({'status': 'ok', 'message': 'RecruitCRM MCP Server is running'})
-
-# ──────────────────────────────────────────────────────────────
-# 0.  Env & constants
-# ──────────────────────────────────────────────────────────────
-load_dotenv()
-API_TOKEN = os.getenv("RCRM_TOKEN")
-if not API_TOKEN:
-    sys.exit("❌  Set RCRM_TOKEN in your environment or .env file")
-
-HEADERS = {
-    "Authorization": f"Bearer {API_TOKEN}",
-    "Content-Type":  "application/json",
-    "Origin":        "https://app.recruitcrm.io"
-}
-BASE_URL = "https://albatross.recruitcrm.io/v1/reports/search/get"
-
-DEBUG = os.getenv("DEBUG", "").lower() in ("1", "true", "yes")
-def log(*a):
-    if DEBUG:
-        print("[recruitcrm_mcp]", *a, file=sys.stderr)
-
-# ──────────────────────────────────────────────────────────────
-# 1.  Dynamic maps from APIs
-# ──────────────────────────────────────────────────────────────
-
-# Cache for dynamic data
-_user_map_cache = None
-_stage_map_cache = None
-
-async def fetch_hiring_stages() -> Dict[str, int]:
-    """Fetch hiring stages from the API and return a label->id mapping."""
-    global _stage_map_cache
-    if _stage_map_cache is not None:
-        return _stage_map_cache
-    
-    url = "https://hiring-pipeline.recruitcrm.io/v1/pipelines/list"
-    async with httpx.AsyncClient(timeout=30) as client:
-        resp = await client.get(url, headers=HEADERS)
-        resp.raise_for_status()
-        data = resp.json()
-        
-        # Get the master hiring pipeline stages
-        master_pipeline = data.get("default-pipeline", {})
-        hiring_stages = master_pipeline.get("hiring_stages", [])
-        
-        # Create label->id mapping
-        stage_map = {}
-        for stage in hiring_stages:
-            label = stage.get("label", "").strip()
-            stage_id = stage.get("id")
-            if label and stage_id is not None:
-                stage_map[label.lower()] = stage_id
-        
-        _stage_map_cache = stage_map
-        return stage_map
-
-async def fetch_users() -> Dict[str, int]:
-    """Fetch users from the API and return a name->id mapping."""
-    global _user_map_cache
-    if _user_map_cache is not None:
-        return _user_map_cache
-    
-    url = "https://albatross.recruitcrm.io/v1/global/get-users-for-rpr?report=recruiter"
-    async with httpx.AsyncClient(timeout=30) as client:
-        resp = await client.post(url, headers=HEADERS, json={})
-        resp.raise_for_status()
-        data = resp.json().get("data", [])
-        
-        # Create name->id mapping for active users
-        user_map = {}
-        for user in data:
-            if user.get("userstatus") == 0:  # Active users only
-                name = user.get("name", "").strip()
-                user_id = user.get("id")
-                if name and user_id is not None:
-                    user_map[name.lower()] = user_id
-        
-        _user_map_cache = user_map
-        return user_map
-
-def label_to_id(label: Optional[str], mapping: Dict[str, int]) -> Optional[int]:
-    if not label: return None
-    key = label.lower().strip()
-    if key in mapping: return mapping[key]
-    for k, v in mapping.items():
-        if key in k: return v
-    return None
-
-# ──────────────────────────────────────────────────────────────
-# 2.  Build Recruit CRM request body
-# ──────────────────────────────────────────────────────────────
-def iso_to_epoch(date_str: str) -> str:
-    ts = int(dt.datetime.fromisoformat(date_str)
-             .replace(tzinfo=dt.timezone.utc).timestamp())
-    return str(ts)                       # API expects *string* epoch seconds
-
-async def build_body(args: Dict[str, Any]) -> Dict[str, Any]:
-    columns = {
-        "stagedate": {
-            "entity": "assignjobcandidate",
-            "field":  "stagedate",
-            "type":   "date",
-            "filter_type": "range",
-            "filter_value":        iso_to_epoch(args["stage_from"]),
-            "filter_value_second": iso_to_epoch(args["stage_to"])
-        }
-    }
-
-    # Fetch dynamic maps
-    user_map = await fetch_users()
-    stage_map = await fetch_hiring_stages()
-
-    upd_id = label_to_id(args.get("updated_by"), user_map)
-    if upd_id is not None:
-        columns["updatedby"] = {
-            "entity": "candidate","field":"updatedby","pseudo":"True",
-            "type":"dropdown","filter_type":"is","filter_value":str(upd_id)
-        }
-
-    stage_id = label_to_id(args.get("hiring_stage"), stage_map)
-    if stage_id is not None:
-        columns["candidatestatusid"] = {
-            "entity":"candidate","field":"candidatestatusid",
-            "type":"dropdown","filter_type":"is","filter_value":str(stage_id)
-        }
-
-    if args.get("job_or_keywords"):
-        columns["jobname"] = {
-            "entity":"assignjobcandidate","field":"jobname","type":"text",
-            "filter_type":"or_search",
-            "filter_value": ",".join(s.strip() for s in args["job_or_keywords"])
-        }
-
-    if args.get("current_stage"):
-        columns["currenthiringstage"] = {
-            "entity":"candidate","field":"currenthiringstage",
-            "type":"multiselect","filter_type":"contains",
-            "filter_value": args["current_stage"]
-        }
-    if args.get("company"):
-        columns["companyname"] = {
-            "entity":"company","field":"companyname","type":"text",
-            "filter_type":"contains","filter_value": args["company"]
-        }
-
-    def add_not_contains(field_key, entity, value):
-        columns[field_key] = {
-            "entity": entity,"field":field_key,"type":"text",
-            "filter_type":"not_contains","filter_value": value
-        }
-    if args.get("company_not_contains"):
-        add_not_contains("companyname", "company",
-                         args["company_not_contains"])
-    if args.get("current_stage_not_contains"):
-        add_not_contains("currenthiringstage", "candidate",
-                         args["current_stage_not_contains"])
-    if args.get("hiring_stage_not_contains"):
-        add_not_contains("candidatestatusid", "candidate",
-                         args["hiring_stage_not_contains"])
-    if args.get("job_not_contains"):
-        add_not_contains("jobname", "assignjobcandidate",
-                         args["job_not_contains"])
-
-    body = {
-        "page":      args.get("page", 1),
-        "page_size": args.get("page_size", 50),
-        "sort_by":   "stagedate",
-        "sortOrder": "desc",
-        "andsearch": [],
-        "orsearch":  [],
-        "notsearch": [],
-        "columns":   columns,
-        "fullTextSearch": True
-    }
-    log("▶️  Request body", json.dumps(body)[:500], "…")
-    return body
-
-# ──────────────────────────────────────────────────────────────
-# 3.  Summarise Recruit CRM response (match Node code)
-# ──────────────────────────────────────────────────────────────
-def summarise(args: Dict[str, Any], payload: Dict[str, Any]) -> Dict[str, Any]:
-    recs = payload.get("records") or []
-    candidates = [{
-        "name":    r.get("candidatename") or "(name N/A)",
-        "job":     r.get("jobname")       or "(job N/A)",
-        "company": r.get("companyname")   or "(company N/A)",
-        "url":     f"https://app.recruitcrm.io/candidate/{r.get('slug')}",
-        "candidatestatus": r.get("candidatestatus"),
-        "currenthiringstage": r.get("currenthiringstage")
-    } for r in recs]
-
-    s = []
-    if args.get("hiring_stage"):              s.append(f'stage = "{args["hiring_stage"]}"')
-    if args.get("hiring_stage_not_contains"): s.append(f'stage NOT "{args["hiring_stage_not_contains"]}"')
-    if args.get("company"):                   s.append(f'company ~ "{args["company"]}"')
-    if args.get("company_not_contains"):      s.append(f'company NOT "{args["company_not_contains"]}"')
-    if args.get("current_stage"):             s.append(f'current stage ~ "{args["current_stage"]}"')
-    if args.get("current_stage_not_contains"):s.append(f'current stage NOT "{args["current_stage_not_contains"]}"')
-    if args.get("job_or_keywords"):           s.append(f'job contains any of [{", ".join(args["job_or_keywords"])}]')
-    if args.get("job_not_contains"):          s.append(f'job NOT "{args["job_not_contains"]}"')
-    if args.get("updated_by"):                s.append(f'updated by {args["updated_by"]}')
-    summary = ", ".join(s) if s else "no extra filters"
-
-    return {
-        "count":   payload.get("filtered_count", len(candidates)),
-        "summary": summary,
-        "candidates": candidates
-    }
-
-# ──────────────────────────────────────────────────────────────
 # 4.  MCP server + tool
 # ──────────────────────────────────────────────────────────────
 mcp = FastMCP("recruitcrm")
@@ -239,19 +22,19 @@ _http_app = mcp.http_app()
 
 # Mount the MCP application at the /mcp path. This will handle
 # both GET and POST requests sent to this endpoint.
-main_app = Starlette(routes=[
-    Mount('/mcp', app=_http_app)
-])
+# main_app = Starlette(routes=[
+#     Mount('/mcp', app=_http_app)
+# ])
 
 # Apply CORS middleware to the main application to allow cross-origin requests
 # from browser-based clients like the Cloudflare Playground.
-app = CORSMiddleware(
-    app=main_app,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+# app = CORSMiddleware(
+#     app=main_app,
+#     allow_origins=["*"],
+#     allow_credentials=True,
+#     allow_methods=["*"],
+#     allow_headers=["*"],
+# )
 
 
 @mcp.tool()
@@ -1445,7 +1228,13 @@ orchestrator = RecruitCRMOrchestrator(tool_registry)
 
 # ──────────────────────────────────────────────────────────────
 if __name__ == "__main__":
-    import uvicorn
+    # For deployment on services like Render, the PORT is provided as an
+    # environment variable. We default to 8000 for local development.
     port = int(os.environ.get("PORT", 8000))
-    print(f"🚀 RecruitCRM MCP server starting for local dev on http://localhost:{port}", file=sys.stderr)
-    uvicorn.run("recruitcrm_mcp:app", host="0.0.0.0", port=port, reload=True)
+
+    # As per the official FastMCP documentation, the `run` method with the
+    # 'http' transport is the correct way to start a production-ready
+    # web server. This handles creating the Uvicorn server and routing.
+    # We bind to 0.0.0.0 to make it accessible outside the container.
+    print(f"🚀 Starting RecruitCRM MCP server on 0.0.0.0:{port}", file=sys.stderr)
+    mcp.run(transport="http", host="0.0.0.0", port=port)

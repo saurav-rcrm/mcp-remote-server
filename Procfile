@@ -1,1 +1,1 @@
-web: gunicorn -w 4 -k uvicorn.workers.UvicornWorker --bind 0.0.0.0:$PORT recruitcrm_mcp:app 
+web: python3 recruitcrm_mcp.py 
