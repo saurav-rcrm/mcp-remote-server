@@ -111,13 +111,13 @@ async def candidate_job_assignment_search(
 
 TEAM_PERFORMANCE_URL = "https://report.recruitcrm.io/v1/reports/team-performance-report"
 TEAM_PERFORMANCE_HEADERS = {  # You may want to move this to .env for security
-    "Authorization": f"Bearer {API_TOKEN}",
+    "Authorization": f"Bearer {RCRM_TOKEN}",
     "Content-Type": "application/json"
 }
 
 KPI_LIST_URL = "https://report.recruitcrm.io/v1/reports-kpi?report_type=1"
 KPI_LIST_HEADERS = {
-    "Authorization": f"Bearer {API_TOKEN}",
+    "Authorization": f"Bearer {RCRM_TOKEN}",
     "Content-Type": "application/json"
 }
 
@@ -161,7 +161,7 @@ async def get_available_kpis() -> list:
 
 USERS_URL = "https://albatross.recruitcrm.io/v1/global/get-users-for-rpr?report=recruiter"
 USERS_HEADERS = {
-    "Authorization": f"Bearer {API_TOKEN}",
+    "Authorization": f"Bearer {RCRM_TOKEN}",
     "Content-Type": "application/json"
 }
 
