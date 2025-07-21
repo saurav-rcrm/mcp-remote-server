@@ -1256,5 +1256,5 @@ if __name__ == "__main__":
     # 'http' transport is the correct way to start a production-ready
     # web server. This handles creating the Uvicorn server and routing.
     # We bind to 0.0.0.0 to make it accessible outside the container.
-    print(f"🚀 Starting RecruitCRM MCP server on 0.0.0.0:{port}", file=sys.stderr)
-    mcp.run(transport="http", host="0.0.0.0", port=port)
+    print(f"🚀 Starting RecruitCRM MCP server on port {port}", file=sys.stderr)
+    mcp.run(transport="http", port=port)
