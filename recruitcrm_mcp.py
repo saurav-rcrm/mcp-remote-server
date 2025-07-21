@@ -232,21 +232,25 @@ def summarise(args: Dict[str, Any], payload: Dict[str, Any]) -> Dict[str, Any]:
 # 4.  MCP server + tool
 # ──────────────────────────────────────────────────────────────
 mcp = FastMCP("recruitcrm")
-_sse_app = mcp.sse_app()
 
-# Mount the SSE app at the /mcp endpoint and add a test route
+# As per the official FastMCP documentation, mcp.http_app() creates the
+# correct application component for the Streamable HTTP transport.
+_http_app = mcp.http_app()
+
+# Mount the MCP application at the /mcp path. This will handle
+# both GET and POST requests sent to this endpoint.
 main_app = Starlette(routes=[
-    Route('/', homepage),
-    Mount('/mcp', app=_sse_app)
+    Mount('/mcp', app=_http_app)
 ])
 
-# Add CORS to the main app
+# Apply CORS middleware to the main application to allow cross-origin requests
+# from browser-based clients like the Cloudflare Playground.
 app = CORSMiddleware(
     app=main_app,
-    allow_origins=["*"],  # Allows all origins
+    allow_origins=["*"],
     allow_credentials=True,
-    allow_methods=["*"],  # Allows all methods
-    allow_headers=["*"],  # Allows all headers
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 
