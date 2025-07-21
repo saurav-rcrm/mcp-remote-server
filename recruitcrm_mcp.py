@@ -221,6 +221,8 @@ def summarise(args: Dict[str, Any], payload: Dict[str, Any]) -> Dict[str, Any]:
 # 4.  MCP server + tool
 # ──────────────────────────────────────────────────────────────
 mcp = FastMCP("recruitcrm")
+app = mcp.asgi_app()
+
 
 @mcp.tool()
 async def candidate_job_assignment_search(
@@ -1413,6 +1415,7 @@ orchestrator = RecruitCRMOrchestrator(tool_registry)
 
 # ──────────────────────────────────────────────────────────────
 if __name__ == "__main__":
+    import uvicorn
     port = int(os.environ.get("PORT", 8000))
-    print(f"🚀 RecruitCRM MCP server starting on 0.0.0.0:{port} (SSE)", file=sys.stderr)
-    mcp.run(host="0.0.0.0", port=port)
+    print(f"🚀 RecruitCRM MCP server starting for local dev on http://localhost:{port}", file=sys.stderr)
+    uvicorn.run("recruitcrm_mcp:app", host="0.0.0.0", port=port, reload=True)
