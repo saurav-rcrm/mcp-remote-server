@@ -8,6 +8,10 @@ import os, sys, datetime as dt, json, httpx
 from typing import Annotated, Optional, List, Dict, Any
 from dotenv import load_dotenv
 from mcp.server.fastmcp import FastMCP
+from typing import Dict, List, Any, Optional
+from dataclasses import dataclass
+from enum import Enum
+from starlette.middleware.cors import CORSMiddleware
 
 # ──────────────────────────────────────────────────────────────
 # 0.  Env & constants
@@ -221,7 +225,15 @@ def summarise(args: Dict[str, Any], payload: Dict[str, Any]) -> Dict[str, Any]:
 # 4.  MCP server + tool
 # ──────────────────────────────────────────────────────────────
 mcp = FastMCP("recruitcrm")
-app = mcp.sse_app()
+_app = mcp.sse_app()
+
+app = CORSMiddleware(
+    app=_app,
+    allow_origins=["*"],  # Allows all origins
+    allow_credentials=True,
+    allow_methods=["*"],  # Allows all methods
+    allow_headers=["*"],  # Allows all headers
+)
 
 
 @mcp.tool()
