@@ -27,11 +27,11 @@ To run the server on your local machine for testing and development:
     ```bash
     python recruitcrm_mcp.py
     ```
-    The server will start on `http://localhost:8000`.
+    The server will start on `http://0.0.0.0:8000`. It reads the port from the `PORT` environment variable, which is necessary for services like Render.
 
 ## Deployment to Render
 
-This application is configured for easy deployment to [Render](https://render.com/).
+This application is configured for easy deployment to [Render](https://render.com/). It is set up to bind to the host and port provided by Render's environment.
 
 1.  **Push your code to GitHub:**
     Create a new repository on GitHub and push this project's code.
@@ -44,7 +44,7 @@ This application is configured for easy deployment to [Render](https://render.co
     - **Name:** A name for your service (e.g., `recruitcrm-mcp-server`).
     - **Runtime:** Render should automatically detect `Python 3`.
     - **Build Command:** `pip install -r requirements.txt`
-    - **Start Command:** Render will automatically use the `web` process from the `Procfile` (`python recruitcrm_mcp.py`).
+    - **Start Command:** Manually enter `python recruitcrm_mcp.py`. Render may suggest `gunicorn app:app`, but you should use the command from our `Procfile`.
 
 4.  **Add Environment Variables:**
     - Go to the **Environment** tab for your new service.

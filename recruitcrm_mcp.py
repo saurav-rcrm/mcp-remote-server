@@ -1413,5 +1413,6 @@ orchestrator = RecruitCRMOrchestrator(tool_registry)
 
 # ──────────────────────────────────────────────────────────────
 if __name__ == "__main__":
-    print("🚀 RecruitCRM MCP server running (SSE)", file=sys.stderr)
-    mcp.run()
+    port = int(os.environ.get("PORT", 8000))
+    print(f"🚀 RecruitCRM MCP server starting on 0.0.0.0:{port} (SSE)", file=sys.stderr)
+    mcp.run(host="0.0.0.0", port=port)
